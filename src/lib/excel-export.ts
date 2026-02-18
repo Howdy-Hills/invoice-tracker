@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import * as XLSX from "xlsx";
 
 // ── Shared Helpers ────────────────────────────────────────
 
@@ -20,143 +21,48 @@ function today(): string {
   });
 }
 
-// Generate xlsx via Python openpyxl (available in the environment)
-async function generateXlsx(data: {
-  sheets: Array<{
-    name: string;
-    titleRows?: string[][];
-    headers: string[];
-    rows: (string | number | null)[][];
-    currencyCols?: number[];
-    percentCols?: number[];
-    colWidths?: number[];
-  }>;
-}): Promise<Buffer> {
-  const { execFile } = await import("child_process");
-  const { writeFile, readFile, unlink } = await import("fs/promises");
-  const path = await import("path");
-  const crypto = await import("crypto");
+interface SheetDef {
+  name: string;
+  titleRows?: string[][];
+  headers: string[];
+  rows: (string | number | null)[][];
+  colWidths?: number[];
+}
 
-  const tmpId = crypto.randomBytes(8).toString("hex");
-  const jsonPath = `/tmp/export-${tmpId}.json`;
-  const outPath = `/tmp/export-${tmpId}.xlsx`;
+function buildWorkbook(sheets: SheetDef[]): Buffer {
+  const wb = XLSX.utils.book_new();
 
-  await writeFile(jsonPath, JSON.stringify(data));
+  for (const sheet of sheets) {
+    const data: (string | number | null)[][] = [];
 
-  return new Promise((resolve, reject) => {
-    execFile(
-      "python3",
-      [
-        "-c",
-        `
-import json, sys
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side, numbers
-from openpyxl.utils import get_column_letter
-
-with open("${jsonPath}") as f:
-    data = json.load(f)
-
-wb = Workbook()
-wb.remove(wb.active)
-
-header_font = Font(name="Arial", bold=True, size=11, color="FFFFFF")
-header_fill = PatternFill("solid", fgColor="4A6741")
-header_align = Alignment(horizontal="center", vertical="center")
-title_font = Font(name="Arial", bold=True, size=14, color="2D3A2D")
-subtitle_font = Font(name="Arial", size=11, color="666666")
-data_font = Font(name="Arial", size=11)
-total_font = Font(name="Arial", bold=True, size=11)
-total_fill = PatternFill("solid", fgColor="F5F0E8")
-thin_border = Border(
-    bottom=Side(style="thin", color="D4D4D4")
-)
-currency_fmt = '$#,##0.00'
-percent_fmt = '0.0%'
-
-for si, sheet_data in enumerate(data["sheets"]):
-    ws = wb.create_sheet(title=sheet_data["name"])
-    row_offset = 0
-
-    # Title rows
-    for tr in sheet_data.get("titleRows", []):
-        row_offset += 1
-        for ci, val in enumerate(tr):
-            cell = ws.cell(row=row_offset, column=ci + 1, value=val)
-            if row_offset == 1:
-                cell.font = title_font
-            else:
-                cell.font = subtitle_font
-
-    if row_offset > 0:
-        row_offset += 1  # blank row
-
-    # Headers
-    row_offset += 1
-    header_row = row_offset
-    for ci, h in enumerate(sheet_data["headers"]):
-        cell = ws.cell(row=header_row, column=ci + 1, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-
-    # Data rows
-    currency_cols = set(sheet_data.get("currencyCols", []))
-    percent_cols = set(sheet_data.get("percentCols", []))
-    rows = sheet_data["rows"]
-
-    for ri, row in enumerate(rows):
-        r = header_row + 1 + ri
-        is_total = ri == len(rows) - 1 and rows and rows[-1] and str(rows[-1][0]).startswith("TOTAL")
-        is_uncat = ri == len(rows) - 1 and rows and rows[-1] and str(rows[-1][0]).startswith("UNCAT")
-        if not is_total and ri == len(rows) - 2 and len(rows) > 1 and rows[-1] and str(rows[-1][0]).startswith("UNCAT"):
-            is_total = str(rows[-2][0]).startswith("TOTAL")
-
-        for ci, val in enumerate(row):
-            cell = ws.cell(row=r, column=ci + 1, value=val)
-            cell.font = total_font if is_total or is_uncat else data_font
-            cell.border = thin_border
-            if is_total or is_uncat:
-                cell.fill = total_fill
-            if ci in currency_cols and isinstance(val, (int, float)):
-                cell.number_format = currency_fmt
-            if ci in percent_cols and isinstance(val, (int, float)):
-                cell.number_format = percent_fmt
-            if ci > 0 and isinstance(val, (int, float)):
-                cell.alignment = Alignment(horizontal="right")
-
-    # Column widths
-    for ci, w in enumerate(sheet_data.get("colWidths", [])):
-        ws.column_dimensions[get_column_letter(ci + 1)].width = w
-
-    # Freeze pane below headers
-    ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
-
-    # Auto-filter on header row
-    if rows:
-        last_col = get_column_letter(len(sheet_data["headers"]))
-        ws.auto_filter.ref = f"A{header_row}:{last_col}{header_row + len(rows)}"
-
-wb.save("${outPath}")
-`,
-      ],
-      { timeout: 30000 },
-      async (err) => {
-        try {
-          await unlink(jsonPath).catch(() => {});
-          if (err) {
-            reject(new Error(`Excel generation failed: ${err.message}`));
-            return;
-          }
-          const buffer = await readFile(outPath);
-          await unlink(outPath).catch(() => {});
-          resolve(buffer);
-        } catch (e) {
-          reject(e);
-        }
+    // Title rows
+    if (sheet.titleRows) {
+      for (const tr of sheet.titleRows) {
+        data.push(tr);
       }
-    );
-  });
+      data.push([]); // blank separator row
+    }
+
+    // Header row
+    data.push(sheet.headers);
+
+    // Data rows
+    for (const row of sheet.rows) {
+      data.push(row);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Column widths
+    if (sheet.colWidths) {
+      ws["!cols"] = sheet.colWidths.map((w) => ({ wch: w }));
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, sheet.name);
+  }
+
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  return Buffer.from(buf);
 }
 
 // ── Budget vs. Actual ─────────────────────────────────────
@@ -188,26 +94,27 @@ export async function generateBudgetReport(
       0
     );
     const remaining = budgeted - spent;
-    const percentUsed = budgeted > 0 ? spent / budgeted : 0;
+    const percentUsed = budgeted > 0 ? Math.round((spent / budgeted) * 100) : 0;
     const status =
-      percentUsed > 1
+      percentUsed > 100
         ? "OVER BUDGET"
-        : percentUsed > 0.9
+        : percentUsed > 90
         ? "WARNING"
         : "OK";
 
-    rows.push([cat.name, budgeted, spent, remaining, percentUsed, status]);
+    rows.push([cat.name, budgeted, spent, remaining, `${percentUsed}%`, status]);
     totalBudgeted += budgeted;
     totalSpent += spent;
   }
 
   // Total row
+  const totalPercent = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
   rows.push([
     "TOTAL",
     totalBudgeted,
     totalSpent,
     totalBudgeted - totalSpent,
-    totalBudgeted > 0 ? totalSpent / totalBudgeted : 0,
+    `${totalPercent}%`,
     "",
   ]);
 
@@ -223,35 +130,31 @@ export async function generateBudgetReport(
       0,
       uncatAmount,
       0,
-      0,
+      "—",
       "NEEDS REVIEW",
     ]);
   }
 
-  return generateXlsx({
-    sheets: [
-      {
-        name: "Budget vs Actual",
-        titleRows: [
-          [`Budget vs. Actual — ${project?.name ?? "Project"}`],
-          [`Client: ${project?.clientName ?? "N/A"}`],
-          [`Generated: ${today()}`],
-        ],
-        headers: [
-          "Category",
-          "Budgeted",
-          "Spent",
-          "Remaining",
-          "% Used",
-          "Status",
-        ],
-        rows,
-        currencyCols: [1, 2, 3],
-        percentCols: [4],
-        colWidths: [28, 16, 16, 16, 12, 16],
-      },
-    ],
-  });
+  return buildWorkbook([
+    {
+      name: "Budget vs Actual",
+      titleRows: [
+        [`Budget vs. Actual — ${project?.name ?? "Project"}`],
+        [`Client: ${project?.clientName ?? "N/A"}`],
+        [`Generated: ${today()}`],
+      ],
+      headers: [
+        "Category",
+        "Budgeted",
+        "Spent",
+        "Remaining",
+        "% Used",
+        "Status",
+      ],
+      rows,
+      colWidths: [28, 16, 16, 16, 12, 16],
+    },
+  ]);
 }
 
 // ── Invoice Detail ────────────────────────────────────────
@@ -377,45 +280,40 @@ export async function generateInvoiceReport(
     ]);
   }
 
-  return generateXlsx({
-    sheets: [
-      {
-        name: "Invoice Summary",
-        titleRows,
-        headers: [
-          "Vendor",
-          "Invoice #",
-          "Date",
-          "Total",
-          "Tax",
-          "Status",
-          "Line Items",
-          "Categorized",
-        ],
-        rows: summaryRows,
-        currencyCols: [3, 4],
-        colWidths: [28, 16, 14, 16, 14, 14, 12, 14],
-      },
-      {
-        name: "Line Items",
-        titleRows: [],
-        headers: [
-          "Vendor",
-          "Invoice #",
-          "Invoice Date",
-          "Description",
-          "Qty",
-          "Unit Price",
-          "Amount",
-          "Category",
-          "Tax Item",
-        ],
-        rows: lineRows,
-        currencyCols: [5, 6],
-        colWidths: [28, 16, 14, 38, 8, 14, 14, 22, 10],
-      },
-    ],
-  });
+  return buildWorkbook([
+    {
+      name: "Invoice Summary",
+      titleRows,
+      headers: [
+        "Vendor",
+        "Invoice #",
+        "Date",
+        "Total",
+        "Tax",
+        "Status",
+        "Line Items",
+        "Categorized",
+      ],
+      rows: summaryRows,
+      colWidths: [28, 16, 14, 16, 14, 14, 12, 14],
+    },
+    {
+      name: "Line Items",
+      headers: [
+        "Vendor",
+        "Invoice #",
+        "Invoice Date",
+        "Description",
+        "Qty",
+        "Unit Price",
+        "Amount",
+        "Category",
+        "Tax Item",
+      ],
+      rows: lineRows,
+      colWidths: [28, 16, 14, 38, 8, 14, 14, 22, 10],
+    },
+  ]);
 }
 
 // ── Vendor Summary ────────────────────────────────────────
@@ -472,14 +370,17 @@ export async function generateVendorReport(
 
   const vendorRows = Array.from(vendorMap.entries())
     .sort((a, b) => b[1].totalSpent - a[1].totalSpent)
-    .map(([vendor, data]) => [
-      vendor,
-      data.invoiceCount,
-      data.totalSpent,
-      Array.from(data.categories).sort().join(", "),
-      formatDateStr(data.firstDate),
-      formatDateStr(data.lastDate),
-    ] as (string | number | null)[]);
+    .map(
+      ([vendor, data]) =>
+        [
+          vendor,
+          data.invoiceCount,
+          data.totalSpent,
+          Array.from(data.categories).sort().join(", "),
+          formatDateStr(data.firstDate),
+          formatDateStr(data.lastDate),
+        ] as (string | number | null)[]
+    );
 
   // Totals
   vendorRows.push([
@@ -495,27 +396,24 @@ export async function generateVendorReport(
     where: { id: projectId, orgId },
   });
 
-  return generateXlsx({
-    sheets: [
-      {
-        name: "Vendor Summary",
-        titleRows: [
-          [`Vendor Summary — ${project?.name ?? "Project"}`],
-          [`Client: ${project?.clientName ?? "N/A"}`],
-          [`Generated: ${today()}`],
-        ],
-        headers: [
-          "Vendor",
-          "# Invoices",
-          "Total Spent",
-          "Categories Used",
-          "First Invoice",
-          "Last Invoice",
-        ],
-        rows: vendorRows,
-        currencyCols: [2],
-        colWidths: [28, 14, 16, 42, 14, 14],
-      },
-    ],
-  });
+  return buildWorkbook([
+    {
+      name: "Vendor Summary",
+      titleRows: [
+        [`Vendor Summary — ${project?.name ?? "Project"}`],
+        [`Client: ${project?.clientName ?? "N/A"}`],
+        [`Generated: ${today()}`],
+      ],
+      headers: [
+        "Vendor",
+        "# Invoices",
+        "Total Spent",
+        "Categories Used",
+        "First Invoice",
+        "Last Invoice",
+      ],
+      rows: vendorRows,
+      colWidths: [28, 14, 16, 42, 14, 14],
+    },
+  ]);
 }
