@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -49,14 +50,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Logo area */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-charcoal-700/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-lg tracking-tight">
-              Invoice Tracker
-            </span>
-          </div>
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              src="/logo.svg"
+              alt="Spear Builders"
+              width={180}
+              height={44}
+              priority
+            />
+          </Link>
           <button
             onClick={onClose}
             className="lg:hidden p-2 rounded-lg hover:bg-sidebar-hover transition-colors"
@@ -94,7 +96,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-charcoal-700/30">
-          <p className="text-xs text-sidebar-muted">Invoice Tracker v0.1</p>
+          <p className="text-xs text-sidebar-muted">Spear Builders Invoice Tracker</p>
         </div>
       </aside>
     </>
