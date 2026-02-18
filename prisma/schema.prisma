@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Organization {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  memberships      OrgMembership[]
+  projects         Project[]
+  budgetCategories BudgetCategory[]
+  budgetTemplates  BudgetTemplate[]
+  invoices         Invoice[]
+  lineItems        LineItem[]
+  vendors          Vendor[]
+  aiSettings       AiSettings?
+  invites          OrgInvite[]
+
+  @@map("organizations")
+}
+
+model OrgMembership {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String   @default("owner") // owner, admin, viewer
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, userId])
+  @@map("org_memberships")
+}
+
+model Project {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  name        String
+  clientName  String?  @map("client_name")
+  description String?
+  status      String   @default("active") // active, completed, archived
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  organization     Organization     @relation(fields: [orgId], references: [id])
+  budgetCategories BudgetCategory[]
+  invoices         Invoice[]
+
+  @@map("projects")
+}
+
+model BudgetCategory {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  name           String
+  budgetedAmount Decimal  @default(0) @map("budgeted_amount") @db.Decimal(12, 2)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lineItems    LineItem[]
+  vendors      Vendor[]
+
+  @@map("budget_categories")
+}
+
+model BudgetTemplate {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  name      String
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization          @relation(fields: [orgId], references: [id])
+  items        BudgetTemplateItem[]
+
+  @@map("budget_templates")
+}
+
+model BudgetTemplateItem {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId    String  @map("template_id") @db.Uuid
+  orgId         String  @map("org_id") @db.Uuid
+  categoryName  String  @map("category_name")
+  defaultAmount Decimal @default(0) @map("default_amount") @db.Decimal(12, 2)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  template BudgetTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("budget_template_items")
+}
+
+model Invoice {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId               String    @map("org_id") @db.Uuid
+  projectId           String    @map("project_id") @db.Uuid
+  vendorName          String?   @map("vendor_name")
+  invoiceNumber       String?   @map("invoice_number")
+  invoiceDate         DateTime? @map("invoice_date") @db.Date
+  totalAmount         Decimal?  @map("total_amount") @db.Decimal(12, 2)
+  taxAmount           Decimal   @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  status              String    @default("pending") // pending, reviewed, approved, paid
+  pdfStoragePath      String?   @map("pdf_storage_path")
+  pdfOriginalFilename String?   @map("pdf_original_filename")
+  parseMethod         String?   @map("parse_method") // 'pdf_js', 'pdf_js_plus_ai', 'manual'
+  parseConfidence     Decimal?  @map("parse_confidence") @db.Decimal(3, 2)
+  notes               String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id])
+  lineItems    LineItem[]
+
+  @@map("invoices")
+}
+
+model LineItem {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  invoiceId          String   @map("invoice_id") @db.Uuid
+  description        String
+  quantity           Decimal  @default(1) @map("quantity") @db.Decimal(10, 3)
+  unitPrice          Decimal? @map("unit_price") @db.Decimal(12, 2)
+  amount             Decimal  @map("amount") @db.Decimal(12, 2)
+  categoryId         String?  @map("category_id") @db.Uuid
+  categoryConfidence Decimal? @map("category_confidence") @db.Decimal(3, 2)
+  categorySuggestion String?  @map("category_suggestion")
+  isTax              Boolean  @default(false) @map("is_tax")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  organization Organization    @relation(fields: [orgId], references: [id])
+  invoice      Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  category     BudgetCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@map("line_items")
+}
+
+model Vendor {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  name              String
+  normalizedName    String?  @map("normalized_name")
+  defaultCategoryId String?  @map("default_category_id") @db.Uuid
+  email             String?
+  phone             String?
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  organization    Organization    @relation(fields: [orgId], references: [id])
+  defaultCategory BudgetCategory? @relation(fields: [defaultCategoryId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, normalizedName])
+  @@map("vendors")
+}
+
+model AiSettings {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId               String   @unique @map("org_id") @db.Uuid
+  provider            String   @default("gemini")
+  apiKeyEncrypted     String?  @map("api_key_encrypted")
+  autoCategorize      Boolean  @default(true) @map("auto_categorize")
+  categorizeThreshold Decimal  @default(0.7) @map("categorize_threshold") @db.Decimal(3, 2)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@map("ai_settings")
+}
+
+model OrgInvite {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  email     String
+  role      String   @default("viewer") // admin, viewer
+  invitedBy String   @map("invited_by") @db.Uuid // user_id of inviter
+  status    String   @default("pending") // pending, accepted, expired
+  token     String   @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@map("org_invites")
+}
