@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, CardSkeleton, Skeleton } from "@/components/ui/skel
 
 export default function DashboardLoading() {
   return (
-    <div className="max-w-7xl space-y-8">
+    <div className="w-full space-y-8">
       <PageHeaderSkeleton />
 
       {/* Stats cards */}

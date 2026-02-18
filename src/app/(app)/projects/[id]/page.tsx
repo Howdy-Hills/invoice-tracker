@@ -22,7 +22,7 @@ export default async function ProjectDetailPage({
   }
 
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="w-full space-y-8">
       <ProjectHeader project={project} />
 
       <div className="space-y-4">

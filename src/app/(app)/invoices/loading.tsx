@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton, TableSkeleton } from "@/components/ui/ske
 
 export default function InvoicesLoading() {
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <PageHeaderSkeleton />
 
       {/* Action buttons */}

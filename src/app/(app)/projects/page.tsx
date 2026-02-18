@@ -12,7 +12,7 @@ export default async function ProjectsPage() {
   const archivedProjects = projects.filter((p) => p.status === "archived");
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-brand-100 flex items-center justify-center">

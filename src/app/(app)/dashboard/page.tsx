@@ -17,7 +17,7 @@ export default async function DashboardPage() {
 
   if (!projectId) {
     return (
-      <div className="max-w-6xl">
+      <div className="w-full">
         <div className="flex items-center gap-4 mb-10">
           <div className="w-16 h-16 rounded-2xl bg-brand-100 flex items-center justify-center flex-shrink-0">
             <LayoutDashboard className="w-8 h-8 text-brand-600" />
@@ -38,7 +38,7 @@ export default async function DashboardPage() {
 
   if (!data) {
     return (
-      <div className="max-w-6xl">
+      <div className="w-full">
         <div className="bg-danger-100 rounded-2xl border border-danger-200 p-8 text-center">
           <p className="text-lg text-danger-600 font-semibold">
             Project not found. Please select a different project.
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl space-y-8">
+    <div className="w-full space-y-8">
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="w-16 h-16 rounded-2xl bg-brand-100 flex items-center justify-center flex-shrink-0">

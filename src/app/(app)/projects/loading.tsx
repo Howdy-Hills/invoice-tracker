@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsLoading() {
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <PageHeaderSkeleton />
 
       <Skeleton className="h-11 w-44 rounded-2xl mb-8" />

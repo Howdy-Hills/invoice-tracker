@@ -19,7 +19,7 @@ export default async function ExportsPage() {
   }
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center gap-4 mb-10">
         <div className="w-16 h-16 rounded-2xl bg-brand-100 flex items-center justify-center flex-shrink-0">

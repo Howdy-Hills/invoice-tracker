@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton, TableSkeleton } from "@/components/ui/ske
 
 export default function VendorsLoading() {
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <PageHeaderSkeleton />
 
       <div className="flex gap-4 mb-8">

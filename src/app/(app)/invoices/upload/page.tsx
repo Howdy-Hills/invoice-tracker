@@ -19,7 +19,7 @@ export default async function UploadPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full">
       <UploadForm
         projectId={project.id}
         projectName={project.name}

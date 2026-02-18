@@ -12,7 +12,7 @@ export default async function ManualEntryPage() {
   if (!project) redirect("/invoices");
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full">
       <ManualEntryForm
         projectId={project.id}
         projectName={project.name}

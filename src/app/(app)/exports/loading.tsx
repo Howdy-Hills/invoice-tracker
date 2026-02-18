@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
 
 export default function ExportsLoading() {
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <PageHeaderSkeleton />
 
       <div className="space-y-6">

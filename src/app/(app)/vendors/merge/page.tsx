@@ -8,7 +8,7 @@ export default async function MergeDuplicatesPage() {
   const groups = await getDuplicateVendors(orgId);
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center gap-4 mb-10">
         <div className="w-16 h-16 rounded-2xl bg-warning-100 flex items-center justify-center flex-shrink-0">

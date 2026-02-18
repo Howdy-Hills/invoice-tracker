@@ -43,7 +43,7 @@ export default async function InvoiceDetailPage({
     .reduce((sum, li) => sum + li.amount, 0);
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       {/* Back Link */}
       <Link
         href="/invoices"
